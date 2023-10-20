@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Historical Monitoring Records</title>
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+
+<div class="container mt-5">
+    <div class="text-center mb-4">
+        <h1>Historical Monitoring Records</h1>
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-md-10">
+            <input type="text" id="searchInput" placeholder="Search video by name..." class="form-control">
+        </div>
+        <div class="col-md-2">
+            <button id="searchButton" class="btn btn-success btn-block">Search</button>
+        </div>
+    </div>
+
+    <div class="mb-4">
+        <button id="listButton" class="btn btn-primary">List All Files</button>
+        <div class="float-right mt-2">Visitor IP: <span id="visitorIP">***.***.***.***</span></div>
+    </div>
+
+    <div id="videoContainer" class="mt-4 mb-4" style="display: none;">
+        <video id="videoPlayer" controls class="w-100"></video>
+    </div>
+
+    <ul id="fileList" class="list-group"></ul>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+<script>
+    function fetchVideos(url) {
+        $.ajax({
+            type: 'GET',
+            url: url,
+            success: function(data) {
+                $('#fileList').empty();
+                data.forEach(function(file) {
+                    $('#fileList').append('<li class="list-group-item"><a href="#" class="play-link" data-file="' + file + '">' + file + '</a></li>');
+                });
+
+                $('.play-link').click(function() {
+                    var fileName = $(this).data('file');
+                    showVideo(fileName);
+                });
+            }
+        });
+    }
+
+    $('#listButton').click(function() {
+        fetchVideos('/listFiles');
+    });
+
+    $('#searchButton').click(function() {
+        let searchQuery = $('#searchInput').val();
+        if(searchQuery) {
+            fetchVideos('/listFiles?search=' + searchQuery);
+        }
+    });
+
+        function showVideo(fileName) {
+        $('#videoContainer').show(); 
+        $('#videoPlayer').empty();
+        var video = document.getElementById('videoPlayer');
+        video.src = '/playVideo?fileName=' + fileName;
+    }
+    $.get('/getVisitorIP', function(data) {
+        $('#visitorIP').text(data.ip);
+    });
+</script>
+</body>
+</html>
