@@ -1,8 +1,10 @@
-import tkinter as tk
-import random
+import subprocess
 import time
 import paho.mqtt.client as mqtt
-import subprocess
+import pygame
+import tkinter as tk
+import random
+
 
 class TableApp:
     def __init__(self, root):
@@ -11,21 +13,22 @@ class TableApp:
         self.frame = tk.Frame(self.root)
         self.frame.pack()
 
-        # Create table headers
+        # Create table titles
         self.titles = ["Zone", "Current Value", "Lasting Time", "Arriving Value", "Next Operation"]
 
         # Initialize last time
         self.last_time = time.time()
 
-        # Number of rows and columns
+        # Rows and columns
         self.rows = 12
         self.cols = 5
 
-        self.row_last_time = {}  # Define here
+        self.row_last_time = {}
+
         # Populate table content
         self.populate_table()
 
-        # Set weights for columns and rows to allow resizing
+        # Set column and row weights to allow resizing
         for col in range(self.cols):
             self.frame.columnconfigure(col, weight=1)
         for row in range(1, self.rows + 1):
@@ -38,7 +41,11 @@ class TableApp:
         self.init_mqtt_client()
         self.previous_mosquitto_data = "0"
 
-    # ... [Other functions] ...
+
+    def play_mp3(self, mp3_path):
+        pygame.mixer.init()
+        pygame.mixer.music.load(mp3_path)
+        pygame.mixer.music.play()
 
     def populate_table(self):
         for col, title in enumerate(self.titles):
@@ -48,7 +55,6 @@ class TableApp:
         for row in range(1, self.rows + 1):
             for col in range(self.cols):
                 if col == 0:
-                    # Set values in the first column to specific values
                     values = ["(1,1)", "(2,1)", "(3,1)", "(4,1)", "(1,2)", "(2,2)", "(3,2)", "(4,2)",
                               "(1,3)", "(2,3)", "(3,3)", "(4,3)"]
                     value = values[row - 1]
@@ -61,7 +67,6 @@ class TableApp:
                 entry.config(state="readonly")
                 entry.grid(row=row, column=col, padx=5, pady=5, sticky="nsew")
 
-                # Set font color of the first row to red
                 if row == 1:
                     entry.config(fg='red')
         for row in range(1, self.rows + 1):
@@ -70,7 +75,6 @@ class TableApp:
     def init_mqtt_client(self):
         def on_message(client, userdata, message):
             self.latest_mosquitto_data = message.payload.decode()
-            # Update the value in the first row, fourth column
             arriving_value_widget = self.frame.grid_slaves(row=1, column=3)[0]
             arriving_value_widget.config(state="normal")
             arriving_value_widget.delete(0, "end")
@@ -83,10 +87,8 @@ class TableApp:
         self.client.connect(mqtt_broker_host, 1883, 60)
         topic = "predict"
         self.client.subscribe(topic)
-        # Start the client loop in a thread to avoid interfering with the main application loop
         self.client.loop_start()
 
-    # Update the corresponding part in the update_table function
     def publish_to_mosquitto(self):
         cmd = [
             "mosquitto_pub",
@@ -96,9 +98,9 @@ class TableApp:
         ]
         try:
             subprocess.run(cmd, check=True)
-            print(f"Published successfully: 1_1")
+            print("Published successfully: 1_1")
         except subprocess.CalledProcessError as e:
-            print(f"Publishing failed: {e}")
+            print(f"Publish failed: {e}")
 
     def update_table(self):
         print("Updating table...")
@@ -154,7 +156,7 @@ class TableApp:
                 current_value_widget.config(state="readonly")
 
                 next_operation_widget.config(state="normal")
-                next_operation_widget.delete  (0, "end")
+                next_operation_widget.delete(0, "end")
                 next_operation_widget.insert(0, next_operation)
                 next_operation_widget.config(state="readonly")
 
@@ -167,23 +169,23 @@ class TableApp:
 
             self.row_last_time[row] = current_time
 
+            if row == 1:
+                if current_value == 0 and arriving_value == 1:
+                    self.play_mp3("/Users/jichanglong/Desktop/voice/appear.mp3")
+                elif current_value == 1 and arriving_value == 0:
+                    self.play_mp3("/Users/jichanglong/Desktop/voice/clean.mp3")
+
         self.last_time = current_time
         self.root.after(1000, self.update_table)
 
+
 root = tk.Tk()
-# Estimate the window size
 window_width = 850
 window_height = 500
-
-# Get the screen size
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
-
-# Calculate x and y coordinates to place the window in the upper right corner of the screen
-x = screen_width - window_width - 100  # Leave a 10-pixel margin
-y = 30  # Leave some space to account for the macOS menu bar
-
-# Set the window size and position
+x = screen_width - window_width - 100
+y = 30
 root.geometry(f"{window_width}x{window_height}+{x}+{y}")
 app = TableApp(root)
 root.mainloop()

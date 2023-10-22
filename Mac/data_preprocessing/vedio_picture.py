@@ -11,11 +11,13 @@ import numpy as np
 import tkinter as tk
 from tkinter import ttk
 import os
+from ML_learning.MobileNetV2 import ML_detect_trash
+from tensorflow.keras.preprocessing.image import load_img, img_to_array
 
 output_folder = "/Users/jichanglong/Desktop/cameradata/"
 output_folder2 = "/Users/jichanglong/Desktop/camerascreen/"
 
-# Define the Mosquitto publishing function
+# Define the Mosquitto publish function
 def publish_to_mosquitto(value):
     cmd = [
         "mosquitto_pub",
@@ -27,15 +29,23 @@ def publish_to_mosquitto(value):
         subprocess.run(cmd, check=True)
         print(f"Published successfully: {value}")
     except subprocess.CalledProcessError as e:
-        print(f"Publishing failed: {e}")
+        print(f"Publish failed: {e}")
 
-def get_value(image_path):
-    image = cv2.imread(image_path)
-    pixel_value = tuple(image[0, 0])
-    value = 1 if random.choice([1, 2]) % 2 else 0
-    time.sleep(1)
-    publish_to_mosquitto(value)  # Publish the value to Mosquitto
-    return value
+def calculate_brightness(img_path):
+    """Calculate the average brightness of an image"""
+    img = load_img(img_path)
+    img_array = img_to_array(img)
+    # Convert to grayscale from RGB
+    grayscale = np.dot(img_array[..., :3], [0.299, 0.587, 0.114])
+    return np.mean(grayscale)
+
+def detect_trash(img_path, reference_brightness = 150):
+    """Detect if there is trash in the image"""
+    brightness = calculate_brightness(img_path)
+    if brightness < reference_brightness:
+        return 1  # Output 1 indicates trash present
+    else:
+        return 0  # Output 0 indicates no trash
 
 def execute():
     while True:
@@ -44,8 +54,10 @@ def execute():
             if images:
                 images = sorted(images, key=os.path.getctime)
                 earliest_image = images[0]
-                get_value(earliest_image)
-                os.remove(earliest_image)  # Delete the image
+                result = detect_trash(earliest_image)
+                #result = ML_detect_trash(earliest_image)
+                publish_to_mosquitto(result)
+                os.remove(earliest_image)  # Remove the image
             time.sleep(1)
         except Exception as e:
             print(f"Execution error: {e}")
@@ -114,10 +126,10 @@ def capture_screenshots():
         try:
             subprocess.run(screenshot_cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
 
-            print(f"Screenshots completed, saved as {output_file}")
+            print(f"Screenshot completed, saved as {output_file}")
             time.sleep(3)
         except subprocess.CalledProcessError as e:
-            print(f"Screenshots failed, error message: {e}")
+            print(f"Screenshot failed, error message: {e}")
 
 if __name__ == "__main__":
     video_thread = threading.Thread(target=record_video)
